@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Process Monitor</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.css">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --danger: #ef4444;
+            --background: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--background);
+            color: var(--text);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .chart-container {
+            height: 250px;
+            position: relative;
+        }
+
+        .data-table {
+            background: var(--card-bg);
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .warning {
+            color: var(--danger);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .warning::before {
+            content: "⚠️";
+            margin-right: 0.25rem;
+        }
+
+        button {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #processTable {
+            width: 100% !important;
+            border-collapse: collapse;
+        }
+
+        #processTable th {
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem;
+            text-align: left;
+        }
+
+        #processTable td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        #processTable tr:hover td {
+            background: #f1f5f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>System Monitoring Dashboard</h1>
+            <p>Real-time process and resource monitoring</p>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2>CPU Usage</h2>
+                <div class="chart-container">
+                    <canvas id="cpuChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Memory Usage</h2>
+                <div class="chart-container">
+                    <canvas id="memoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="data-table">
+            <table id="processTable" class="display">
+                <thead>
+                    <tr>
+                        <th>PID</th>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>CPU %</th>
+                        <th>Memory %</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="processBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Scripts remain the same -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        // JavaScript code remains identical to previous version
+    </script>
+</body>
+</html>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    
+    <script>
+        const socket = io();
+        let cpuChart, memoryChart;
+        let dataTable;
+
+        // Initialize Charts
+        function initCharts() {
+            const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+            const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+
+            cpuChart = new Chart(cpuCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'CPU Usage (%)',
+                        data: [],
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                }
+            });
+
+            memoryChart = new Chart(memoryCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Memory Usage (%)',
+                        data: [],
+                        borderColor: 'rgb(255, 99, 132)',
+                        tension: 0.1
+                    }]
+                }
+            });
+        }
+
+        // Update Charts
+        function updateChart(chart, value) {
+            const now = new Date().toLocaleTimeString();
+            chart.data.labels.push(now);
+            chart.data.datasets[0].data.push(value);
+            if (chart.data.labels.length > 15) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+            }
+            chart.update();
+        }
+
+        // Update Process Table
+        function updateProcessTable(processes) {
+            const tbody = $('#processBody').empty();
+            processes.sort((a, b) => b.cpu_percent - a.cpu_percent);
+
+            processes.forEach(proc => {
+                const row = `
+                    <tr>
+                        <td>${proc.pid}</td>
+                        <td>${proc.name}</td>
+                        <td>${proc.status}</td>
+                        <td class="${proc.cpu_percent > 50 ? 'warning' : ''}">${proc.cpu_percent.toFixed(1)}</td>
+                        <td class="${proc.memory_percent > 50 ? 'warning' : ''}">${proc.memory_percent.toFixed(1)}</td>
+                        <td>
+                            <button onclick="terminateProcess(${proc.pid})">Terminate</button>
+                        </td>
+                    </tr>
+                `;
+                tbody.append(row);
+            });
+
+            if (!dataTable) {
+                dataTable = $('#processTable').DataTable();
+            } else {
+                dataTable.destroy();
+                dataTable = $('#processTable').DataTable();
+            }
+        }
+
+        // Terminate Process
+        function terminateProcess(pid) {
+            if (confirm('Are you sure you want to terminate this process?')) {
+                $.post('/terminate', { pid }, (response) => {
+                    if (response.success) {
+                        alert('Process terminated successfully');
+                    } else {
+                        alert('Error: ' + response.error);
+                    }
+                });
+            }
+        }
+
+        // Socket.IO Listeners
+        socket.on('system_stats', (data) => {
+            updateChart(cpuChart, data.cpu);
+            updateChart(memoryChart, data.memory);
+            updateProcessTable(data.processes);
+        });
+
+        // Initialize Dashboard
+        $(document).ready(() => {
+            initCharts();
+        });
+    </script>
+</body>
+</html>
